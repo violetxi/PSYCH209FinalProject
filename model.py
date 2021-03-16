@@ -130,10 +130,11 @@ class VisionLanguageModel(nn.Module):
         lang_x = lang_x.type(torch.cuda.FloatTensor)
         visual_z, _ = self.visual.get_embds(vis_x)      
         language_z = self.language(lang_x)
-        memory_z = visual_z + language_z        
+        memory_z = visual_z + language_z
         visual_recon, language_recon = self.memory(memory_z)
-        visual_loss = F.mse_loss(visual_recon, visual_z)
-        language_loss = F.mse_loss(language_recon, language_z)
-        loss = visual_loss + language_loss
+        visual_recon = F.normalize(visual_recon, p=2, dim=1)
+        language_recon = F.normalize(language_recon, p=2, dim=1)
+        # contrastive loss between visual and language features
+        loss = 1 - (visual_recon * language_recon).sum(dim=1).mean()
         return loss
         

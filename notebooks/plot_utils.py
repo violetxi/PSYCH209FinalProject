@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 def plot_loss(ckpt_path):
-    which_model = ckpt_path.split('_')[0]
+    which_model = ckpt_path[ckpt_path.rfind('/') + 1 : ].split('_')[0]
     checkpoint = torch.load(ckpt_path)
     losses = checkpoint['losses']    
     plt.plot(losses)
