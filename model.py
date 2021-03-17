@@ -126,15 +126,21 @@ class VisionLanguageModel(nn.Module):
         self.language = LanguageModel(input_dim, hidden_dim)
         self.memory = SemanticMemoryModel(mv_input_dim, ml_input_dim, m_hidden_dim)
 
+    def stop_grads_forward(self, p, z):
+        z = z.detach()
+        p = F.normalize(p, p=2, dim=1)
+        z = F.normalize(z, p=2, dim=1)
+        return 1 - (p * z).sum(dim=1).mean()    # minimize cosine distance
+
     def forward(self, vis_x, lang_x):
         lang_x = lang_x.type(torch.cuda.FloatTensor)
         visual_z, _ = self.visual.get_embds(vis_x)      
         language_z = self.language(lang_x)
         memory_z = visual_z + language_z
         visual_recon, language_recon = self.memory(memory_z)
-        visual_recon = F.normalize(visual_recon, p=2, dim=1)
-        language_recon = F.normalize(language_recon, p=2, dim=1)
+        d1 = self.stop_grads_forward(visual_recon, language_recon)
+        d2 = self.stop_grads_forward(language_recon, visual_recon)
         # contrastive loss between visual and language features
-        loss = 1 - (visual_recon * language_recon).sum(dim=1).mean()
+        loss = d1 + d2
         return loss
         
