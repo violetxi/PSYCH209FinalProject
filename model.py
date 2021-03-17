@@ -87,16 +87,13 @@ class VisualModel(nn.Module):
     
 
 class LanguageModel(nn.Module):
-    def __init__(self, input_dim=140, hidden_dim=64):    # using Rogers implementation
+    def __init__(self, input_dim=140, hidden_dim=512, embd_dim=64):
         super(LanguageModel, self).__init__()
-        self.fc = nn.Sequential(            
-            nn.Linear(input_dim, hidden_dim),            
-            nn.BatchNorm1d(hidden_dim),            
-            nn.ReLU(),)
+        self.head = Head(input_dim, hidden_dim)    # add non-linear projection head to try to prevent contrastive loss collapsing
 
     def forward(self, x):
-        x = self.fc(x)
-        return x
+        z, p = self.head(x)
+        return z, p
 
 
 class SemanticMemoryModel(nn.Module):
@@ -134,12 +131,12 @@ class VisionLanguageModel(nn.Module):
 
     def forward(self, vis_x, lang_x):
         lang_x = lang_x.type(torch.cuda.FloatTensor)
-        visual_z, _ = self.visual.get_embds(vis_x)      
-        language_z = self.language(lang_x)
-        memory_z = visual_z + language_z
-        visual_recon, language_recon = self.memory(memory_z)
-        d1 = self.stop_grads_forward(visual_recon, language_recon)
-        d2 = self.stop_grads_forward(language_recon, visual_recon)
+        vz, vp = self.visual.get_embds(vis_x)      
+        lz, lp = self.language(lang_x)
+        memory_z = vz + lz
+        v_recon, l_recon = self.memory(memory_z)
+        d1 = self.stop_grads_forward(vp, l_recon) / 2
+        d2 = self.stop_grads_forward(lp, v_recon) / 2
         # contrastive loss between visual and language features
         loss = d1 + d2
         return loss
