@@ -162,12 +162,15 @@ class RunExp:
             feat1 = feats[i]
             for j in range(N):
                 feat2 = feats[j]
-                dist = np.linalg.norm(feat1 - feat2)                
+                #dist = np.linalg.norm(feat1 - feat2)
+                dist = np.dot(feat1, feat2) / (
+                    np.linalg.norm(feat1) * np.linalg.norm(feat2)
+                )
                 dist_mat[i, j] = dist
-                
+        
         ax = sns.heatmap(dist_mat, linewidths=.5,
                          yticklabels=labels, xticklabels=labels)
-        ax.set_title(f'{which_data} Euclidean Dis')
+        ax.set_title(f'{which_data} cosine similarity')
         plt.xticks(rotation=90)
         plt.savefig(
             f'{FULL_BASE_PATH}figs/{which_data}_dists.png',
@@ -179,7 +182,7 @@ class RunExp:
         classes = []
         all_flatten_images = []
         for class_ in class_all_flatten_ims:
-            classes.append(classes)
+            classes.append(class_)
             all_flatten_images.extend(
                 class_all_flatten_ims[class_]
             )
@@ -212,6 +215,6 @@ if __name__ == '__main__':
     run_exp = RunExp(
         args.which_model, args.embd_path, args.result_folder
     )
-    #run_exp.vis_input_verbal_distance()
+    run_exp.vis_input_verbal_distance()
     run_exp.vis_input_image_distance()
     #run_exp.vis_learned_visual_embds()
