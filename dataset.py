@@ -8,7 +8,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 
-META_PATH = 'data/meta.pkl'
+META_PATH = '/mnt/fs1/ziyxiang/classes/PSYCH209FinalProject/data/meta.pkl'
 
 
 class VisualLauguageBuilder(Dataset):
@@ -27,7 +27,8 @@ class VisualLauguageBuilder(Dataset):
         for class_ in self.metas:            
             image_paths = self.metas[class_]['image_paths']
             verbal_descriptor = torch.from_numpy(
-                self.metas[class_]['verbal_descriptor'])
+                self.metas[class_]['verbal_descriptor']
+            )
             for image_path in image_paths:
                 self.image_paths.append(image_path)
                 self.verbal_descriptors.append(verbal_descriptor)                

@@ -3,7 +3,11 @@ import pdb
 import pickle
 import argparse
 import numpy as np
+import cv2 as cv
+import pandas as pd
+import seaborn as sns; sns.set_theme()
 from matplotlib import pyplot as plt
+from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.cluster.hierarchy import dendrogram, linkage
 
@@ -14,10 +18,9 @@ from tqdm import tqdm
 from dataset import VisualLauguageBuilder
 from model import VisualModel, VisionLanguageModel
 
-
 VISION_ONLY_CKPT = '/mnt/fs1/ziyxiang/classes/PSYCH209FinalProject/checkpoints/vision-only_90.pth'
 VISION_LANGUAGE_CKPT = '/mnt/fs1/ziyxiang/classes/PSYCH209FinalProject/checkpoints/vision-language_90.pth'
-
+FULL_BASE_PATH = '/mnt/fs1/ziyxiang/classes/PSYCH209FinalProject/'
 
 def load_args():
     parser = argparse.ArgumentParser(description='Running vision/vision-language model')
@@ -38,15 +41,15 @@ class RunExp:
         self.which_model = which_model
         self.embd_path = embd_path
         self.result_folder = result_folder
+        self.__load_data()
         if self.embd_path is None:    # only need to get embeddings when no saved embeddings are available
-            self.__load_data()
             self.__load_model()
         self.load_label_map()
         self.load_embds()
         
     def __load_data(self):
-        dataset = VisualLauguageBuilder(vision_only=False, analysis=True)    # returns normalized image and verbal desc
-        self.dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+        self.dataset = VisualLauguageBuilder(vision_only=False, analysis=True)    # returns normalized image and verbal desc
+        self.dataloader = DataLoader(self.dataset, batch_size=1, shuffle=False)
 
     def __load_ckpt(self):
         if self.which_model == 'vision-only':
@@ -69,7 +72,7 @@ class RunExp:
         self.model.eval()
 
     def load_label_map(self):
-        text_label_path = '/mnt/fs1/ziyxiang/classes/PSYCH209FinalProject/data/textlabels.txt'
+        text_label_path = f'{FULL_BASE_PATH}data/textlabels.txt'
         f = open(text_label_path, 'r')
         self.label_map = {
             int(l.split()[1]) : l.split()[0] for l in f
@@ -117,7 +120,7 @@ class RunExp:
             leaf_font_size=8
         )
         plt.savefig(
-            f'/mnt/fs1/ziyxiang/classes/PSYCH209FinalProject/figs/{self.which_model}_dendrogram.png',
+            f'{FULL_BASE_PATH}figs/{self.which_model}_dendrogram.png',
             dpi=300
         )
             
@@ -135,12 +138,72 @@ class RunExp:
         knn = KNeighborsClassifier(n_neighbors=n_neighbors)
         knn.fit(embds, labels)
         scores = knn.score(embds, labels)
-        return scores
+        return scores    
+    
+    def load_all_images(self, paths):
+        self.class_all_flatten_ims = {}
+        for path in paths:
+            path = f'{FULL_BASE_PATH}{path}'
+            im = cv.imread(path, 0)
+            im = cv.resize(im, (64, 64))    # to speed up PCA
+            im = im.flatten()
+            class_ = path.split('/')[-2]
+            if class_ in self.class_all_flatten_ims:
+                self.class_all_flatten_ims[class_].append(im)
+            else:
+                self.class_all_flatten_ims[class_] = [im]
+
+    # feats (28, 140), labels (28) either names or label_idx
+    def vis_distance_matrix(self, feats, labels, which_data):
+        N = len(labels)
+        dist_mat = np.zeros((N, N))
+        for i in range(N):
+            for j in range(N):
+                dist = np.linalg.norm(feats[i] - feats[j])
+                dist_mat[i, j] = dist
+        df = pd.DataFrame(dist_mat, index=labels, columns=labels)
+        ax = sns.heatmap(dist_mat, linewidths=.5,
+                         yticklabels=labels, xticklabels=labels)        
+        ax.set_title(f'{which_data} Euclidean Dis')
+        plt.xticks(rotation=90)        
         
+    def vis_input_image_distance(self):
+        self.load_all_images(self.dataset.image_paths)
+        classes = []
+        all_flatten_images = []
+        for class_ in self.class_all_flatten_ims:
+            classes.append(classes)
+            all_flatten_images.extend(
+                self.class_all_flatten_ims[class_]
+            )
+        all_flatten_images = np.stack(all_flatten_images)
         
+        pca = PCA(140)    # PCA reduce to 140 dimension, same as verbal description input
+        pca.fit(all_flatten_images)
+        pca_feats = []
+        for class_ in self.class_all_flatten_ims:
+            flatten_ims = self.class_all_flatten_ims[class_]
+            reduced_images = pca.transform(flatten_ims)
+            mean_components = reduced_images.mean(axis=0)    # use "prototype representation" for each class
+            pca_feats.append(mean_components)
+        pca_feats = np.stack(pca_feats)
+        self.vis_distance_matrix(pca_feats, classes, 'visual_stimuli')
+
+    def vis_input_verbal_distance(self):
+        def tensor_to_numpy(descs):
+            descs_numpy = [desc.numpy() for desc in descs]
+            return np.stack(descs_numpy)
+        
+        verbal_descs = self.dataset.verbal_descriptors[0::1300]
+        verbal_descs = tensor_to_numpy(verbal_descs)
+        classes = list(self.label_map.values())        
+        self.vis_distance_matrix(verbal_descs, classes, 'verbal_descriptor')            
+        
+    
 if __name__ == '__main__':
     args = load_args()
     run_exp = RunExp(
         args.which_model, args.embd_path, args.result_folder
     )
+    run_exp.vis_input_verbal_distance()
     #run_exp.vis_learned_visual_embds()
