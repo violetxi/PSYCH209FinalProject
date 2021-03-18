@@ -141,48 +141,55 @@ class RunExp:
         return scores    
     
     def load_all_images(self, paths):
-        self.class_all_flatten_ims = {}
+        class_all_flatten_ims = {}
         for path in paths:
             path = f'{FULL_BASE_PATH}{path}'
             im = cv.imread(path, 0)
             im = cv.resize(im, (64, 64))    # to speed up PCA
             im = im.flatten()
             class_ = path.split('/')[-2]
-            if class_ in self.class_all_flatten_ims:
-                self.class_all_flatten_ims[class_].append(im)
+            if class_ in class_all_flatten_ims:
+                class_all_flatten_ims[class_].append(im)
             else:
-                self.class_all_flatten_ims[class_] = [im]
+                class_all_flatten_ims[class_] = [im]
+        return class_all_flatten_ims
 
     # feats (28, 140), labels (28) either names or label_idx
     def vis_distance_matrix(self, feats, labels, which_data):
         N = len(labels)
         dist_mat = np.zeros((N, N))
         for i in range(N):
+            feat1 = feats[i]
             for j in range(N):
-                dist = np.linalg.norm(feats[i] - feats[j])
+                feat2 = feats[j]
+                dist = np.linalg.norm(feat1 - feat2)                
                 dist_mat[i, j] = dist
-        df = pd.DataFrame(dist_mat, index=labels, columns=labels)
+                
         ax = sns.heatmap(dist_mat, linewidths=.5,
-                         yticklabels=labels, xticklabels=labels)        
+                         yticklabels=labels, xticklabels=labels)
         ax.set_title(f'{which_data} Euclidean Dis')
-        plt.xticks(rotation=90)        
+        plt.xticks(rotation=90)
+        plt.savefig(
+            f'{FULL_BASE_PATH}figs/{which_data}_dists.png',
+            dpi=300
+        )
         
     def vis_input_image_distance(self):
-        self.load_all_images(self.dataset.image_paths)
+        class_all_flatten_ims = self.load_all_images(self.dataset.image_paths)
         classes = []
         all_flatten_images = []
-        for class_ in self.class_all_flatten_ims:
+        for class_ in class_all_flatten_ims:
             classes.append(classes)
             all_flatten_images.extend(
-                self.class_all_flatten_ims[class_]
+                class_all_flatten_ims[class_]
             )
         all_flatten_images = np.stack(all_flatten_images)
         
         pca = PCA(140)    # PCA reduce to 140 dimension, same as verbal description input
         pca.fit(all_flatten_images)
         pca_feats = []
-        for class_ in self.class_all_flatten_ims:
-            flatten_ims = self.class_all_flatten_ims[class_]
+        for class_ in class_all_flatten_ims:
+            flatten_ims = class_all_flatten_ims[class_]
             reduced_images = pca.transform(flatten_ims)
             mean_components = reduced_images.mean(axis=0)    # use "prototype representation" for each class
             pca_feats.append(mean_components)
@@ -205,5 +212,6 @@ if __name__ == '__main__':
     run_exp = RunExp(
         args.which_model, args.embd_path, args.result_folder
     )
-    run_exp.vis_input_verbal_distance()
+    #run_exp.vis_input_verbal_distance()
+    run_exp.vis_input_image_distance()
     #run_exp.vis_learned_visual_embds()
