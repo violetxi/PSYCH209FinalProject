@@ -25,7 +25,7 @@ class DataPreprocessing(object):
         f = open(self.raw_txt_labels, 'r')
         for line in f:
             raw_info = line.split()
-            class_ = raw_info[0]                        
+            class_ = raw_info[0]            
             label_idx = int(raw_info[1])
             label = self.make_one_hot_name_vector(label_idx)
             descriptor = np.asarray(raw_info[3:], dtype=int)

@@ -43,6 +43,7 @@ class VisualLauguageBuilder(Dataset):
         )
         if self.analysis:
             preprocess = transforms.Compose([
+                transforms.Resize(224),
                 transforms.ToTensor(),
                 normalize,
             ])
@@ -67,15 +68,13 @@ class VisualLauguageBuilder(Dataset):
         if self.vision_only:
             img1 = self.preprocess1(img)
             img2 = self.preprocess2(img)
-            #return torch.stack([img1, img2])
             return img1, img2
         else:
             img = self.preprocess(img)
             verbal_desc = self.verbal_descriptors[idx]
             return img, verbal_desc            
             
-        
-        
+                
 if __name__ == '__main__':
     builder = VisualLauguageBuilder(META_PATH, vision_only=True)
     loader = DataLoader(builder, batch_size=10, shuffle=True, num_workers=0)
